@@ -15,6 +15,15 @@ def parse_matrix(text):
     return eval(match.group(0))
 
 
+def has_negative_cycle_reachable(matrix, source):
+    """Détecte un cycle négatif atteignable depuis source (inclut boucles sur place)."""
+    n = len(matrix)
+    for i in range(n):
+        if matrix[i][i] < 0 and can_reach(matrix, source, i):
+            return True
+    return False
+
+
 def bellman_ford(matrix, source, target):
     """
     Bellman-Ford pour le plus court chemin.
@@ -26,6 +35,10 @@ def bellman_ford(matrix, source, target):
     pred = [-1] * n
     dist[source] = 0
 
+    # Boucle négative sur place (ex: matrix[5][5]=-5)
+    if has_negative_cycle_reachable(matrix, source):
+        return None, "cycle absorbant"
+
     # Relax edges n-1 times
     for _ in range(n - 1):
         for u in range(n):
@@ -35,19 +48,18 @@ def bellman_ford(matrix, source, target):
                     dist[v] = dist[u] + w
                     pred[v] = u
 
-    # Check for negative cycles reachable from source and on path to target
+    # Vérifier cycle négatif au n-ième passage
     for u in range(n):
         for v in range(n):
             w = matrix[u][v]
             if w != 0 and dist[u] != INF and dist[u] + w < dist[v]:
-                # Negative cycle found - check if it's "absorbant" (reachable from target)
-                if can_reach(matrix, v, target) or can_reach(matrix, target, v):
+                if can_reach(matrix, source, u):
                     return None, "cycle absorbant"
 
     if dist[target] == INF:
         return None, "pas de chemin"
 
-    # Reconstruct path
+    # Reconstruire le chemin
     path = []
     cur = target
     while cur != -1:
@@ -96,26 +108,24 @@ def solve(text):
 def main():
     host, port = "ctf.2600.eu", 7780
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(10)
+    s.settimeout(15)
     s.connect((host, port))
 
-    data = b""
     while True:
-        chunk = s.recv(4096)
-        if not chunk:
-            break
-        data += chunk
-        if b">" in data or b"?" in data:
-            break
+        data = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                return
+            data += chunk
+            text = data.decode("utf-8", errors="ignore")
+            print(text, end="")
+            if b">" in data:
+                break
 
-    text = data.decode("utf-8", errors="ignore")
-    print(text)
-
-    answer = solve(text)
-    print(f"Réponse: {answer}")
-    s.send((answer + "\n").encode())
-    s.settimeout(5)
-    print(s.recv(4096).decode("utf-8", errors="ignore"))
+        answer = solve(text)
+        print(f"Réponse: {answer}")
+        s.send((answer + "\n").encode())
 
 
 if __name__ == "__main__":
